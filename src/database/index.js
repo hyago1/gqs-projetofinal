@@ -3,7 +3,6 @@ const { Sequelize } = require('sequelize');
 const UserModel = require('../models/User');
 const ProductModel = require('../models/Product');
 
-
 const sequelize = new Sequelize('', 'postgres', '2003', {
     host: 'localhost',
     dialect: 'postgres',

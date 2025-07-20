@@ -1,4 +1,4 @@
-// __tests__/user.test.js
+
 const request = require('supertest');
 const app = require('../app');
 const { sequelize, connectDB } = require('../src/database');
@@ -34,7 +34,7 @@ describe('User API', () => {
         expect(res.body.user.email).toEqual(newUser.email);
     });
 
-    // Teste POST /users - Dados inválidos (nome faltando)
+    
     it('should return 400 if user name is missing', async () => {
         const invalidUser = {
             email: `invaliduser${Date.now()}@example.com`,
@@ -67,8 +67,7 @@ describe('User API', () => {
             .send(existingEmailUser); // Tenta usar o mesmo email
 
         expect(res.statusCode).toEqual(409); // Status de Conflito
-        // CORREÇÃO: Espera a mensagem de erro mais específica do PostgreSQL
-        // Usamos .toContain() no elemento do array para verificar se a string esperada está contida na mensagem de erro do PostgreSQL
+    
         expect(res.body.errors[0]).toContain(`Chave (email)=(${existingEmailUser.email}) já existe.`);
     });
 
