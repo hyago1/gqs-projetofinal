@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Usuário</title>
+    <style>
+        #user-list {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 15px;
+        }
+
+        .user-item {
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .user-item strong {
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <a href="/"></a>
+    <h1>Cadastrar Novo Usuário</h1>
+
+    <div id="success-messages" style="color: green;"></div>
+    <div id="error-messages" style="color: red;"></div>
+
+    <form id="userRegisterForm">
+        <label for="name">Nome:</label>
+        <input type="text" id="name" name="name" ><br>
+        <div class="field-error" data-field="name"></div><br>
+
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required><br>
+        <div class="field-error" data-field="email"></div><br>
+
+        <label for="password">Senha:</label>
+        <input type="password" id="password" name="password" required><br>
+        <div class="field-error" data-field="password"></div><br>
+
+        <button type="submit">Cadastrar Usuário</button>
+    </form>
+    <p><a href="/">Voltar</a></p>
+
+    <h2>Usuários Cadastrados</h2>
+    <div id="user-list">
+        Carregando usuários...
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('userRegisterForm');
+            const successMessagesDiv = document.getElementById('success-messages');
+            const errorMessagesDiv = document.getElementById('error-messages');
+            const userListDiv = document.getElementById('user-list'); // Novo elemento para a lista
+
+            function clearMessages() {
+                successMessagesDiv.innerText = '';
+                errorMessagesDiv.innerText = '';
+                document.querySelectorAll('.field-error').forEach(div => div.innerText = '');
+            }
+
+            function displayFieldErrors(errors) {
+                clearMessages();
+                if (Array.isArray(errors)) {
+                    errors.forEach(errorText => {
+                        const match = errorText.match(/(\w+) precisa/);
+                        if (match && match[1]) {
+                            const fieldName = match[1].toLowerCase();
+                            const fieldErrorDiv = document.querySelector(`.field-error[data-field="${fieldName}"]`);
+                            if (fieldErrorDiv) {
+                                fieldErrorDiv.innerText = errorText;
+                            } else {
+                                errorMessagesDiv.innerText += errorText + '\n';
+                            }
+                        } else {
+                            errorMessagesDiv.innerText += errorText + '\n';
+                        }
+                    });
+                } else if (typeof errors === 'string') {
+                    errorMessagesDiv.innerText = errors;
+                }
+            }
+
+            // Função para carregar e exibir a lista de usuários
+            async function loadUsers() {
+                try {
+
+                    const response = await fetch('/users'); // Requisição GET para buscar todos os usuários
+                    const users = await response.json(); // Converte a resposta para JSON
+
+                    userListDiv.innerHTML = ''; // Limpa o conteúdo atual
+
+                    if (users.length === 0) { //
+                        userListDiv.innerText = 'Nenhum usuário cadastrado ainda.'; //
+                        return; //
+                    }
+
+                    // Renderiza a lista de usuários
+                    users.forEach(user => { //
+                        const userItem = document.createElement('div'); //
+                        userItem.className = 'user-item'; //
+                        userItem.innerHTML = `
+                            <strong>Nome:</strong> ${user.name}<br>
+                            <strong>Email:</strong> ${user.email}<br>
+                            <button class="delete-button" data-user-id="${user.id}">Deletar</button>
+                            `; //
+                        userListDiv.appendChild(userItem); //
+                    });
+                } catch (error) { //
+                    console.error('Erro ao carregar usuários:', error); //
+                    userListDiv.innerText = 'Erro ao carregar usuários. Tente novamente.'; //
+                }
+            }
+
+
+            userListDiv.addEventListener('click', async (event) => {
+                if (event.target.classList.contains('delete-button')) {
+                    const userIdToDelete = event.target.dataset.userId; // Pega o ID do atributo data-user-id
+                    if (confirm(`Tem certeza que deseja deletar o usuário com ID ${userIdToDelete}?`)) {
+                        try {
+
+                            const response = await fetch(`/users/${userIdToDelete}`, { // DELETE para /users/:id
+                                method: 'DELETE'
+                            });
+
+                            if (response.ok) { // Status 204 No Content também é 'ok'
+                                successMessagesDiv.innerText = 'Usuário deletado com sucesso!';
+                                loadUsers(); // Recarrega a lista para mostrar a remoção
+                            } else {
+                                const errorData = await response.json();
+                                errorMessagesDiv.innerText = errorData.message || 'Erro ao deletar usuário.';
+                            }
+                        } catch (error) {
+                            console.error('Erro ao deletar:', error);
+                            errorMessagesDiv.innerText = 'Não foi possível conectar ao servidor para deletar.';
+                        }
+                    }
+                }
+            });
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                clearMessages();
+
+                const formData = {
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                };
+
+                try {
+                    const response = await fetch('/users', { 
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        successMessagesDiv.innerText = data.message || 'Usuário cadastrado com sucesso!';
+                        form.reset();
+                        loadUsers(); // Recarrega a lista após um novo cadastro
+                    } else {
+                        if (data.errors) {
+                            displayFieldErrors(data.errors);
+                        } else {
+                            errorMessagesDiv.innerText = data.message || 'Ocorreu um erro ao cadastrar.';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Erro na requisição:', error);
+                    errorMessagesDiv.innerText = 'Não foi possível conectar ao servidor. Tente novamente.';
+                }
+            });
+
+            // Carregar usuários assim que a página for carregada
+            loadUsers();
+        });
+    </script>
+</body>
+
+</html>

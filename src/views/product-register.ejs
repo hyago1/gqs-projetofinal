@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Produto</title>
+    <style>
+
+        input ,button{
+            padding: 10px;
+        }
+        form{
+            padding: 5px; border: 1px solid gray; width: min-content;
+        }
+        #product-list {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 15px;
+        }
+
+        .product-item { 
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .product-item strong { 
+            color: #333;
+        }
+
+       
+        .message.success { color: green; }
+        .message.error { color: red; }
+        .field-error { color: red; font-size: 0.9em; margin-top: 5px; }
+
+        .product-item:hover{
+             background-color: #d8d8d8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cadastrar Novo Produto</h1>
+
+    <div id="success-messages" class="message success"></div>
+    <div id="error-messages" class="message error"></div>
+
+    <form id="productRegisterForm"> <label for="name">Nome do Produto:</label><br>
+        <input type="text" id="name" name="name" value="" required> 
+        <div class="field-error" data-field="name"></div> 
+        <label for="price">Preço:</label><br>
+        <input type="number" id="price" name="price" step="0.01" value="" required><br>
+        <div class="field-error" data-field="price"></div>
+
+        <label for="description">Descrição:</label><br>
+        <textarea id="description" name="description"></textarea>
+        <div class="field-error" data-field="description"></div>
+
+        <button type="submit">Cadastrar Produto</button>
+    </form>
+    <p><a href="/">Voltar</a></p>
+
+    <h2>Produtos Cadastrados</h2>
+    <div id="product-list">
+        Carregando produtos...
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('productRegisterForm'); 
+            const successMessagesDiv = document.getElementById('success-messages');
+            const errorMessagesDiv = document.getElementById('error-messages'); 
+            const productListDiv = document.getElementById('product-list'); 
+            // Função para limpar mensagens de erro/sucesso
+            function clearMessages() {
+                successMessagesDiv.innerText = '';
+                errorMessagesDiv.innerText = '';
+                document.querySelectorAll('.field-error').forEach(div => div.innerText = '');
+            }
+
+            // Função para exibir erros por campo (adaptada para produtos)
+            function displayFieldErrors(errors) {
+                clearMessages();
+                if (Array.isArray(errors)) {
+                    errors.forEach(errorText => {
+                       
+                        const match = errorText.toLowerCase().match(/(nome|preço|descrição|price)/);
+                        let fieldName = 'general';
+                        if (match && match[1]) {
+                             if (match[1] === 'nome') fieldName = 'name';
+                             if (match[1] === 'preço' || match[1] === 'price') fieldName = 'price';
+                             if (match[1] === 'descrição') fieldName = 'description';
+                        }
+                        const fieldErrorDiv = document.querySelector(`.field-error[data-field="${fieldName}"]`);
+                        if (fieldErrorDiv) {
+                            fieldErrorDiv.innerText = errorText;
+                        } else {
+                            errorMessagesDiv.innerText += errorText + '\n';
+                        }
+                    });
+                } else if (typeof errors === 'string') {
+                    errorMessagesDiv.innerText = errors;
+                }
+            }
+
+            // Função para carregar e exibir a lista de produtos
+            async function loadProducts() {
+                try {
+              
+                    const response = await fetch('/products'); // Requisição GET para buscar todos os produtos
+                    const products = await response.json(); // Converte a resposta para JSON
+
+                    productListDiv.innerHTML = ''; // Limpa o conteúdo atual
+
+                    if (products.length === 0) {
+                        productListDiv.innerText = 'Nenhum produto cadastrado ainda.'; 
+                        return;
+                    }
+
+                    // Renderiza a lista de produtos
+                    products.forEach(product => {
+                        const productItem = document.createElement('div');
+                        productItem.className = 'product-item'; 
+                        productItem.innerHTML = `
+                            <strong>Nome:</strong> ${product.name}<br>
+                            <strong>Preço:</strong> ${product.price}<br> <strong>
+                            Descrição:</strong> ${product.description}<br>
+                            <button class="delete-button" data-product-id="${product.id}">Deletar</button> `;
+                        productListDiv.appendChild(productItem);
+                    });
+                } catch (error) {
+                    console.error('Erro ao carregar produtos:', error);
+                    productListDiv.innerText = 'Erro ao carregar produtos. Tente novamente.';
+                }
+            }
+
+            // Event listener para os botões de deletar
+            productListDiv.addEventListener('click', async (event) => {
+                if (event.target.classList.contains('delete-button')) {
+                    const productIdToDelete = event.target.dataset.productId; 
+                    if (confirm(`Tem certeza que deseja deletar o produto com ID ${productIdToDelete}?`)) { 
+                        try {
+                         
+                            const response = await fetch(`/products/${productIdToDelete}`, {
+                                method: 'DELETE'
+                            });
+
+                            if (response.ok) { // Status 204 No Content também é 'ok'
+                                successMessagesDiv.innerText = 'Produto deletado com sucesso!'; 
+                                errorMessagesDiv.innerText = ''; // Limpa erros
+                                loadProducts(); // Recarrega a lista
+                            } else {
+                                const errorData = await response.json();
+                                errorMessagesDiv.innerText = errorData.message || 'Erro ao deletar produto.'; 
+                                successMessagesDiv.innerText = ''; // Limpa sucesso
+                            }
+                        } catch (error) {
+                            console.error('Erro ao deletar:', error);
+                            errorMessagesDiv.innerText = 'Não foi possível conectar ao servidor para deletar.';
+                        }
+                    }
+                }
+            });
+
+            // Event listener para submissão do formulário
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault(); // Impede o envio padrão do formulário
+
+                clearMessages(); // Limpa mensagens anteriores
+
+                // Coleta os dados do formulário
+                const formData = {
+                    name: document.getElementById('name').value,
+                    price: parseFloat(document.getElementById('price').value), // Converta para número aqui
+                    description: document.getElementById('description').value
+                };
+
+                console.log(formData.price);
+                
+
+                try {
+                   
+                    const response = await fetch('/products', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const data = await response.json(); // Pega a resposta em JSON
+
+                    if (response.ok) { // Se a resposta for 2xx (200, 201, etc.)
+                        successMessagesDiv.innerText = data.message || 'Produto cadastrado com sucesso!'; 
+                        errorMessagesDiv.innerText = ''; // Limpa erros
+                        form.reset(); // Limpa o formulário
+                        loadProducts(); // Recarrega a lista após um novo cadastro
+                    } else { // Se a resposta for 4xx ou 5xx
+                        if (data.errors) {
+                            displayFieldErrors(data.errors);
+                        } else {
+                            errorMessagesDiv.innerText = data.message || 'Ocorreu um erro ao cadastrar o produto.'; 
+                        }
+                        successMessagesDiv.innerText = ''; // Limpa sucesso
+                    }
+                } catch (error) {
+                    console.error('Erro na requisição:', error);
+                    errorMessagesDiv.innerText = 'Não foi possível conectar ao servidor. Tente novamente.';
+                }
+            });
+
+            // Carregar produtos assim que a página for carregada
+            loadProducts();
+        });
+    </script>
+
+</body>
+</html>
